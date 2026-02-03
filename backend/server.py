@@ -501,7 +501,7 @@ async def get_meal_plan(start_date: str = None, end_date: str = None, user: User
             query["date"] = {"$lte": end_date}
     
     entries = await db.meal_plans.find(query).sort("date", 1).to_list(100)
-    return entries
+    return convert_mongo_doc(entries)
 
 @api_router.delete("/meal-plan/{entry_id}")
 async def remove_from_meal_plan(entry_id: str, user: User = Depends(get_current_user)):
