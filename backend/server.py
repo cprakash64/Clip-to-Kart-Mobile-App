@@ -427,14 +427,14 @@ async def extract_recipe(request: RecipeExtractRequest, user: User = Depends(get
 @api_router.get("/recipes")
 async def get_recipes(user: User = Depends(get_current_user)):
     recipes = await db.recipes.find({"user_id": user.id}).sort("created_at", -1).to_list(100)
-    return recipes
+    return convert_mongo_doc(recipes)
 
 @api_router.get("/recipes/{recipe_id}")
 async def get_recipe(recipe_id: str, user: User = Depends(get_current_user)):
     recipe = await db.recipes.find_one({"id": recipe_id, "user_id": user.id})
     if not recipe:
         raise HTTPException(status_code=404, detail="Recipe not found")
-    return recipe
+    return convert_mongo_doc(recipe)
 
 @api_router.delete("/recipes/{recipe_id}")
 async def delete_recipe(recipe_id: str, user: User = Depends(get_current_user)):
