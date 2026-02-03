@@ -107,99 +107,123 @@ user_problem_statement: "Build Clip-to-Cart app - paste video links from TikTok/
 backend:
   - task: "User Registration"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Implemented JWT-based auth with email/password registration"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: User registration working correctly. Creates user with JWT token, validates email uniqueness, returns proper user data with subscription plan."
 
   - task: "User Login"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "JWT login with token generation"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: User login working correctly. Validates credentials, generates JWT token, returns user data. Monthly recipe counter resets properly."
 
   - task: "Recipe Extraction with AI"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Using Emergent LLM key with GPT-4o to extract ingredients from video URLs"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: AI recipe extraction working perfectly. Successfully extracts recipes from YouTube, TikTok, and Instagram URLs. GPT-4o integration via Emergent API working. Properly rejects invalid platform URLs. Respects subscription limits (5 recipes/month for normal plan)."
 
   - task: "Get Recipes List"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Returns all recipes for authenticated user"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Get recipes endpoint working correctly. Returns user's recipes in descending order by creation date. Fixed MongoDB ObjectId serialization issue during testing."
 
   - task: "Delete Recipe"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Delete recipe by ID"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Recipe deletion working correctly. Properly validates user ownership and returns success message."
 
   - task: "Toggle Ingredient Checked"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Toggle checked state for grocery list items"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Ingredient toggle working correctly. Successfully toggles checked state and returns updated status."
 
   - task: "Subscription Upgrade"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Mock upgrade to Chef plan"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Subscription upgrade working correctly. Successfully upgrades user to Chef plan. Note: This is MOCKED implementation - no actual payment processing."
 
   - task: "Meal Plan CRUD"
     implemented: true
-    working: NA
+    working: true
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "medium"
-    needs_retesting: true
+    needs_retesting: false
     status_history:
       - working: NA
         agent: "main"
         comment: "Add/get/remove meal plan entries (Chef plan only)"
+      - working: true
+        agent: "testing"
+        comment: "✅ TESTED: Meal planning CRUD operations working correctly. Add, get, and delete meal plan entries. Properly enforces Chef plan requirement. Fixed MongoDB ObjectId serialization issue during testing."
 
 frontend:
   - task: "Auth Screens (Login/Register)"
