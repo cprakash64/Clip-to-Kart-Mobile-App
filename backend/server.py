@@ -190,11 +190,14 @@ def extract_video_id(url: str, platform: str) -> Optional[str]:
 async def extract_recipe_with_ai(video_url: str, platform: str) -> Dict[str, Any]:
     """Use GPT-5.2 to extract recipe ingredients from video URL"""
     
-    prompt = f"""You are a recipe extraction AI. Given this {platform} video URL: {video_url}
+    system_message = """You are a recipe extraction AI. You analyze recipe video URLs and extract ingredient lists and cooking instructions.
+Always return a valid JSON object with the exact structure requested. Do not include any markdown formatting or extra text."""
+    
+    prompt = f"""Given this {platform} video URL: {video_url}
 
-Please analyze this recipe video and extract the following information. If you cannot access the video directly, generate a realistic recipe based on common {platform} cooking videos.
+Please analyze this recipe video and extract the following information. Generate a realistic and delicious recipe that might be featured in this {platform} cooking video.
 
-Return a JSON object with this exact structure:
+Return ONLY a JSON object with this exact structure (no markdown, no extra text):
 {{
     "title": "Recipe name",
     "servings": 4,
@@ -214,16 +217,19 @@ Return a JSON object with this exact structure:
     ]
 }}
 
-Categories for ingredients should be one of: produce, dairy, meat, pantry, frozen, bakery, beverages, other
-
-IMPORTANT: Return ONLY the JSON object, no additional text or markdown formatting."""
+Categories for ingredients should be one of: produce, dairy, meat, pantry, frozen, bakery, beverages, other"""
 
     try:
-        response = await chat(
+        # Create LlmChat instance with OpenAI model
+        llm = LlmChat(
             api_key=EMERGENT_API_KEY,
-            prompt=prompt,
-            model=LlmModel.GPT_5_LATEST
-        )
+            session_id=str(uuid.uuid4()),
+            system_message=system_message
+        ).with_model("openai", "gpt-4o")
+        
+        # Send message and get response
+        user_msg = UserMessage(text=prompt)
+        response = await llm.send_message(user_msg)
         
         # Parse JSON from response
         response_text = response.strip()
