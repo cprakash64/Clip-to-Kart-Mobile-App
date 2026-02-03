@@ -101,3 +101,184 @@
 #====================================================================================================
 # Testing Data - Main Agent and testing sub agent both should log testing data below this section
 #====================================================================================================
+
+user_problem_statement: "Build Clip-to-Cart app - paste video links from TikTok/Instagram/YouTube recipe videos, AI extracts ingredients into categorized grocery list. Subscription plans: Normal (5 recipes/month), Chef (unlimited + meal planning)"
+
+backend:
+  - task: "User Registration"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Implemented JWT-based auth with email/password registration"
+
+  - task: "User Login"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "JWT login with token generation"
+
+  - task: "Recipe Extraction with AI"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Using Emergent LLM key with GPT-4o to extract ingredients from video URLs"
+
+  - task: "Get Recipes List"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Returns all recipes for authenticated user"
+
+  - task: "Delete Recipe"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Delete recipe by ID"
+
+  - task: "Toggle Ingredient Checked"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Toggle checked state for grocery list items"
+
+  - task: "Subscription Upgrade"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Mock upgrade to Chef plan"
+
+  - task: "Meal Plan CRUD"
+    implemented: true
+    working: NA
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Add/get/remove meal plan entries (Chef plan only)"
+
+frontend:
+  - task: "Auth Screens (Login/Register)"
+    implemented: true
+    working: NA
+    file: "/app/frontend/app/(auth)/login.tsx, /app/frontend/app/(auth)/register.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Login and registration screens with form validation"
+
+  - task: "Recipe Extraction Screen"
+    implemented: true
+    working: NA
+    file: "/app/frontend/app/(tabs)/index.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "URL input, extraction button, categorized ingredient display"
+
+  - task: "My Recipes Screen"
+    implemented: true
+    working: NA
+    file: "/app/frontend/app/(tabs)/recipes.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Recipe list with expandable cards, ingredient checkbox toggling"
+
+  - task: "Meal Planner Screen"
+    implemented: true
+    working: NA
+    file: "/app/frontend/app/(tabs)/planner.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "Calendar view with meal plan entries (Chef plan only)"
+
+  - task: "Profile Screen"
+    implemented: true
+    working: NA
+    file: "/app/frontend/app/(tabs)/profile.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: false
+    status_history:
+      - working: NA
+        agent: "main"
+        comment: "User info, subscription status, upgrade option"
+
+metadata:
+  created_by: "main_agent"
+  version: "1.0"
+  test_sequence: 1
+  run_ui: false
+
+test_plan:
+  current_focus:
+    - "User Registration"
+    - "User Login"
+    - "Recipe Extraction with AI"
+    - "Get Recipes List"
+    - "Subscription Upgrade"
+  stuck_tasks: []
+  test_all: true
+  test_priority: "high_first"
+
+agent_communication:
+  - agent: "main"
+    message: "MVP implementation complete. Backend has auth, recipe extraction with AI (GPT-4o via Emergent), subscription management, and meal planning. Please test all backend endpoints. Authentication uses JWT tokens. Test user registration, login, recipe extraction with YouTube/TikTok/Instagram URLs, and subscription upgrade."
