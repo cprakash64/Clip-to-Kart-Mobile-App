@@ -102,6 +102,23 @@ class RecipeExtractRequest(BaseModel):
 class UpgradeRequest(BaseModel):
     plan: str  # "chef"
 
+# ==================== HELPERS ====================
+
+def convert_mongo_doc(doc):
+    """Convert MongoDB document to JSON-serializable format"""
+    if doc is None:
+        return None
+    if isinstance(doc, list):
+        return [convert_mongo_doc(item) for item in doc]
+    if isinstance(doc, dict):
+        result = {}
+        for key, value in doc.items():
+            if key == '_id':
+                continue  # Skip MongoDB _id field
+            result[key] = convert_mongo_doc(value)
+        return result
+    return doc
+
 # ==================== AUTH HELPERS ====================
 
 def hash_password(password: str) -> str:
