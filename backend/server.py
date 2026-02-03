@@ -14,7 +14,7 @@ import jwt
 import bcrypt
 import json
 import re
-from emergentintegrations.llm.chat import chat, LlmModel
+from emergentintegrations.llm.chat import LlmChat, UserMessage
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
