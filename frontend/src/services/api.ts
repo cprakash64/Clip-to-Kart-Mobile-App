@@ -112,6 +112,22 @@ class ApiService {
   async getPlans() {
     return this.request('/subscription/plans');
   }
+
+  // Grocery Export endpoints (Chef Plan only)
+  async getSupportedStores() {
+    return this.request('/grocery/stores');
+  }
+
+  async exportGroceryList(recipeIds: string[], store: string = 'other', format: string = 'text') {
+    return this.request('/grocery/export', {
+      method: 'POST',
+      body: JSON.stringify({ recipe_ids: recipeIds, store, format }),
+    });
+  }
+
+  async getCombinedGroceryList(recipeIds: string[]) {
+    return this.request(`/grocery/combined?recipe_ids=${recipeIds.join(',')}`);
+  }
 }
 
 export const api = new ApiService();
