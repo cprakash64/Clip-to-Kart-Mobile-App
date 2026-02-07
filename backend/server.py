@@ -369,22 +369,30 @@ async def extract_recipe_with_ai(video_url: str, platform: str) -> Dict[str, Any
         video_context = f"No content could be extracted from this {platform} video URL: {video_url}"
         logger.warning(f"No content could be extracted from video: {video_url}")
     
-    system_message = """You are a recipe extraction AI expert. Your job is to analyze video content (transcripts, titles, descriptions) and extract the exact recipe being shown.
+    system_message = """You are a recipe extraction AI expert. Your job is to analyze video content (transcripts, titles, descriptions) and extract or reconstruct the recipe being shown.
 
 IMPORTANT RULES:
-1. Extract the ACTUAL recipe from the provided content - do NOT make up or guess recipes
-2. If the content clearly shows a recipe, extract all ingredients with precise quantities
-3. If the content is not about cooking/recipes, indicate that in your response
-4. Return valid JSON only, no markdown formatting
-5. Be accurate with ingredient quantities and names as mentioned in the video"""
+1. If the video title or description clearly indicates a recipe/dish name, ALWAYS provide a complete recipe
+2. Use your culinary knowledge to provide accurate, standard recipes for the dish mentioned
+3. If specific ingredients are mentioned in the content, use those exact ingredients
+4. If only the dish name is available (common for short videos), generate a complete, accurate recipe for that dish
+5. Only return is_recipe: false if the content is clearly NOT about food/cooking
+6. Return valid JSON only, no markdown formatting
+7. Be generous - if it looks like a recipe video, extract/generate the recipe"""
     
-    prompt = f"""Analyze the following {platform} video content and extract the recipe information.
+    prompt = f"""Analyze the following {platform} video content and extract/reconstruct the recipe.
 
 {video_context}
 
-Based on this content, extract the recipe details. Return ONLY a JSON object with this exact structure (no markdown, no extra text):
+IMPORTANT: 
+- If you can identify the dish name from the title or description, provide a COMPLETE recipe for that dish
+- Use your culinary expertise to fill in standard ingredients and instructions for the identified dish
+- Short-form videos (TikTok, Shorts, Reels) often only show the title - still provide the full recipe
+- Only say is_recipe: false if this is clearly NOT a cooking/recipe video
+
+Return ONLY a JSON object with this exact structure (no markdown, no extra text):
 {{
-    "title": "Exact recipe name from the video",
+    "title": "Recipe name from the video",
     "servings": 4,
     "prep_time": "X mins",
     "cook_time": "X mins", 
@@ -403,7 +411,7 @@ Based on this content, extract the recipe details. Return ONLY a JSON object wit
     "is_recipe": true
 }}
 
-If the video content is NOT about a recipe or you cannot determine the recipe, return:
+Only if the video is clearly NOT about cooking/food, return:
 {{
     "title": "Unknown",
     "is_recipe": false,
