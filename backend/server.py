@@ -254,7 +254,7 @@ async def get_tiktok_video_info(url: str) -> Dict[str, Any]:
     """Get TikTok video info using yt-dlp"""
     try:
         result = subprocess.run(
-            ['yt-dlp', '--dump-json', '--no-download', url],
+            ['/root/.venv/bin/yt-dlp', '--dump-json', '--no-download', url],
             capture_output=True,
             text=True,
             timeout=30
