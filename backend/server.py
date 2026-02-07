@@ -654,6 +654,230 @@ async def toggle_ingredient(recipe_id: str, ingredient_index: int, user: User = 
     
     return {"checked": ingredients[ingredient_index]['checked']}
 
+# ==================== GROCERY EXPORT ENDPOINTS (Chef Plan Only) ====================
+
+SUPPORTED_STORES = {
+    "walmart": {
+        "name": "Walmart",
+        "icon": "cart",
+        "color": "#0071CE",
+        "deep_link": "walmart://",
+        "web_url": "https://www.walmart.com/lists"
+    },
+    "instacart": {
+        "name": "Instacart",
+        "icon": "storefront",
+        "color": "#43B02A",
+        "deep_link": "instacart://",
+        "web_url": "https://www.instacart.com"
+    },
+    "amazon_fresh": {
+        "name": "Amazon Fresh",
+        "icon": "logo-amazon",
+        "color": "#FF9900",
+        "deep_link": "com.amazon.mShop.android.shopping://",
+        "web_url": "https://www.amazon.com/alm/storefront"
+    },
+    "kroger": {
+        "name": "Kroger",
+        "icon": "basket",
+        "color": "#E31837",
+        "deep_link": "kroger://",
+        "web_url": "https://www.kroger.com"
+    },
+    "target": {
+        "name": "Target",
+        "icon": "radio-button-on",
+        "color": "#CC0000",
+        "deep_link": "target://",
+        "web_url": "https://www.target.com/lists"
+    },
+    "other": {
+        "name": "Other / Copy List",
+        "icon": "copy",
+        "color": "#666666",
+        "deep_link": None,
+        "web_url": None
+    }
+}
+
+class ExportGroceryRequest(BaseModel):
+    recipe_ids: List[str]  # Can export from multiple recipes
+    store: str = "other"
+    format: str = "text"  # text, markdown, json
+
+@api_router.get("/grocery/stores")
+async def get_supported_stores(user: User = Depends(get_current_user)):
+    """Get list of supported grocery stores for export"""
+    return {
+        "stores": [
+            {
+                "id": store_id,
+                "name": store["name"],
+                "icon": store["icon"],
+                "color": store["color"],
+                "has_deep_link": store["deep_link"] is not None
+            }
+            for store_id, store in SUPPORTED_STORES.items()
+        ],
+        "is_chef_plan": user.subscription_plan == "chef"
+    }
+
+@api_router.post("/grocery/export")
+async def export_grocery_list(request: ExportGroceryRequest, user: User = Depends(get_current_user)):
+    """Export grocery list to various formats for adding to cart (Chef Plan only)"""
+    
+    # Check if user has Chef plan
+    if user.subscription_plan != 'chef':
+        raise HTTPException(
+            status_code=403,
+            detail="Add to Cart feature is only available for Chef plan subscribers. Upgrade now!"
+        )
+    
+    # Get all requested recipes
+    recipes = await db.recipes.find({
+        "id": {"$in": request.recipe_ids},
+        "user_id": user.id
+    }).to_list(100)
+    
+    if not recipes:
+        raise HTTPException(status_code=404, detail="No recipes found")
+    
+    # Combine and deduplicate ingredients from all recipes
+    combined_ingredients = {}
+    recipe_titles = []
+    
+    for recipe in recipes:
+        recipe_titles.append(recipe.get('title', 'Recipe'))
+        for ing in recipe.get('ingredients', []):
+            key = ing['name'].lower().strip()
+            if key in combined_ingredients:
+                # Ingredient already exists, maybe update quantity note
+                combined_ingredients[key]['recipes'].append(recipe.get('title', 'Recipe'))
+            else:
+                combined_ingredients[key] = {
+                    'name': ing['name'],
+                    'quantity': ing['quantity'],
+                    'unit': ing['unit'],
+                    'category': ing.get('category', 'other'),
+                    'recipes': [recipe.get('title', 'Recipe')]
+                }
+    
+    # Group by category
+    categorized = {}
+    for ing in combined_ingredients.values():
+        cat = ing['category']
+        if cat not in categorized:
+            categorized[cat] = []
+        categorized[cat].append(ing)
+    
+    # Generate export based on format
+    store_info = SUPPORTED_STORES.get(request.store, SUPPORTED_STORES["other"])
+    
+    if request.format == "json":
+        export_data = {
+            "store": request.store,
+            "recipe_titles": recipe_titles,
+            "total_items": len(combined_ingredients),
+            "categories": categorized,
+            "ingredients": list(combined_ingredients.values())
+        }
+    elif request.format == "markdown":
+        lines = [f"# 🛒 Grocery List"]
+        lines.append(f"*From: {', '.join(recipe_titles)}*\n")
+        
+        category_emojis = {
+            "produce": "🥬",
+            "dairy": "🥛",
+            "meat": "🥩",
+            "pantry": "🥫",
+            "frozen": "🧊",
+            "bakery": "🍞",
+            "beverages": "🥤",
+            "other": "📦"
+        }
+        
+        for cat, items in categorized.items():
+            emoji = category_emojis.get(cat, "📦")
+            lines.append(f"\n## {emoji} {cat.title()}")
+            for item in items:
+                lines.append(f"- [ ] {item['quantity']} {item['unit']} {item['name']}")
+        
+        export_data = {
+            "text": "\n".join(lines),
+            "store": request.store,
+            "total_items": len(combined_ingredients)
+        }
+    else:  # text format (default)
+        lines = [f"GROCERY LIST"]
+        lines.append(f"From: {', '.join(recipe_titles)}")
+        lines.append("-" * 30)
+        
+        for cat, items in categorized.items():
+            lines.append(f"\n{cat.upper()}:")
+            for item in items:
+                lines.append(f"  • {item['quantity']} {item['unit']} {item['name']}")
+        
+        lines.append(f"\n-" * 30)
+        lines.append(f"Total: {len(combined_ingredients)} items")
+        
+        export_data = {
+            "text": "\n".join(lines),
+            "store": request.store,
+            "store_info": {
+                "name": store_info["name"],
+                "deep_link": store_info["deep_link"],
+                "web_url": store_info["web_url"]
+            },
+            "total_items": len(combined_ingredients)
+        }
+    
+    return export_data
+
+@api_router.get("/grocery/combined")
+async def get_combined_grocery_list(recipe_ids: str, user: User = Depends(get_current_user)):
+    """Get combined grocery list from multiple recipes (Chef Plan only)"""
+    
+    if user.subscription_plan != 'chef':
+        raise HTTPException(
+            status_code=403,
+            detail="Combined grocery lists are only available for Chef plan subscribers."
+        )
+    
+    ids = recipe_ids.split(",")
+    recipes = await db.recipes.find({
+        "id": {"$in": ids},
+        "user_id": user.id
+    }).to_list(100)
+    
+    # Combine ingredients
+    combined = {}
+    for recipe in recipes:
+        for ing in recipe.get('ingredients', []):
+            key = ing['name'].lower().strip()
+            if key not in combined:
+                combined[key] = {
+                    'name': ing['name'],
+                    'quantity': ing['quantity'],
+                    'unit': ing['unit'],
+                    'category': ing.get('category', 'other'),
+                    'checked': False
+                }
+    
+    # Group by category
+    categorized = {}
+    for ing in combined.values():
+        cat = ing['category']
+        if cat not in categorized:
+            categorized[cat] = []
+        categorized[cat].append(ing)
+    
+    return {
+        "total_items": len(combined),
+        "categories": categorized,
+        "ingredients": list(combined.values())
+    }
+
 # ==================== MEAL PLAN ENDPOINTS ====================
 
 @api_router.post("/meal-plan")
