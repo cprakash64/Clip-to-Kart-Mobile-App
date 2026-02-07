@@ -276,7 +276,7 @@ async def get_instagram_video_info(url: str) -> Dict[str, Any]:
     """Get Instagram video info using yt-dlp"""
     try:
         result = subprocess.run(
-            ['yt-dlp', '--dump-json', '--no-download', url],
+            ['/root/.venv/bin/yt-dlp', '--dump-json', '--no-download', url],
             capture_output=True,
             text=True,
             timeout=30
