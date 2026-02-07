@@ -818,7 +818,7 @@ async def export_grocery_list(request: ExportGroceryRequest, user: User = Depend
             for item in items:
                 lines.append(f"  • {item['quantity']} {item['unit']} {item['name']}")
         
-        lines.append(f"\n-" * 30)
+        lines.append("\n" + "-" * 30)
         lines.append(f"Total: {len(combined_ingredients)} items")
         
         export_data = {
