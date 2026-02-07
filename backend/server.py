@@ -207,22 +207,285 @@ def extract_video_id(url: str, platform: str) -> Optional[str]:
             return match.group(1)
     return None
 
+# ==================== VIDEO CONTENT EXTRACTION ====================
+
+async def get_youtube_transcript(video_id: str) -> Optional[str]:
+    """Fetch transcript/captions from YouTube video"""
+    try:
+        # Try to get transcript in various languages
+        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        
+        # Try English first, then any available transcript
+        transcript = None
+        try:
+            transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
+        except:
+            # Get first available transcript and translate if needed
+            for t in transcript_list:
+                transcript = t
+                break
+        
+        if transcript:
+            transcript_data = transcript.fetch()
+            # Combine all text segments
+            full_text = ' '.join([segment['text'] for segment in transcript_data])
+            return full_text
+            
+    except (TranscriptsDisabled, NoTranscriptFound) as e:
+        logger.warning(f"No transcript available for YouTube video {video_id}: {e}")
+    except Exception as e:
+        logger.error(f"Error fetching YouTube transcript: {e}")
+    
+    return None
+
+async def get_youtube_video_info(video_id: str) -> Dict[str, Any]:
+    """Get YouTube video title, description using yt-dlp"""
+    try:
+        result = subprocess.run(
+            ['yt-dlp', '--dump-json', '--no-download', f'https://www.youtube.com/watch?v={video_id}'],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return {
+                'title': data.get('title', ''),
+                'description': data.get('description', ''),
+                'uploader': data.get('uploader', ''),
+                'duration': data.get('duration', 0)
+            }
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Timeout getting YouTube video info for {video_id}")
+    except Exception as e:
+        logger.error(f"Error getting YouTube video info: {e}")
+    return {}
+
+async def get_tiktok_video_info(url: str) -> Dict[str, Any]:
+    """Get TikTok video info using yt-dlp"""
+    try:
+        result = subprocess.run(
+            ['yt-dlp', '--dump-json', '--no-download', url],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return {
+                'title': data.get('title', '') or data.get('description', ''),
+                'description': data.get('description', ''),
+                'uploader': data.get('uploader', '') or data.get('creator', ''),
+            }
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Timeout getting TikTok video info")
+    except Exception as e:
+        logger.error(f"Error getting TikTok video info: {e}")
+    return {}
+
+async def get_instagram_video_info(url: str) -> Dict[str, Any]:
+    """Get Instagram video info using yt-dlp"""
+    try:
+        result = subprocess.run(
+            ['yt-dlp', '--dump-json', '--no-download', url],
+            capture_output=True,
+            text=True,
+            timeout=30
+        )
+        if result.returncode == 0:
+            data = json.loads(result.stdout)
+            return {
+                'title': data.get('title', '') or data.get('description', ''),
+                'description': data.get('description', ''),
+                'uploader': data.get('uploader', '') or data.get('channel', ''),
+            }
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Timeout getting Instagram video info")
+    except Exception as e:
+        logger.error(f"Error getting Instagram video info: {e}")
+    return {}
+
+async def get_video_content(url: str, platform: str, video_id: Optional[str]) -> Dict[str, Any]:
+    """Get video content (transcript, title, description) based on platform"""
+    content = {
+        'transcript': None,
+        'title': None,
+        'description': None,
+        'uploader': None
+    }
+    
+    if platform == 'youtube' and video_id:
+        # Try to get transcript first
+        transcript = await get_youtube_transcript(video_id)
+        content['transcript'] = transcript
+        
+        # Get video info (title, description)
+        video_info = await get_youtube_video_info(video_id)
+        content['title'] = video_info.get('title')
+        content['description'] = video_info.get('description')
+        content['uploader'] = video_info.get('uploader')
+        
+    elif platform == 'tiktok':
+        video_info = await get_tiktok_video_info(url)
+        content['title'] = video_info.get('title')
+        content['description'] = video_info.get('description')
+        content['uploader'] = video_info.get('uploader')
+        
+    elif platform == 'instagram':
+        video_info = await get_instagram_video_info(url)
+        content['title'] = video_info.get('title')
+        content['description'] = video_info.get('description')
+        content['uploader'] = video_info.get('uploader')
+    
+    return content
+
 # ==================== AI EXTRACTION ====================
 
 async def extract_recipe_with_ai(video_url: str, platform: str) -> Dict[str, Any]:
-    """Use GPT-5.2 to extract recipe ingredients from video URL"""
+    """Use GPT-4o to extract recipe ingredients from video content"""
     
-    system_message = """You are a recipe extraction AI. You analyze recipe video URLs and extract ingredient lists and cooking instructions.
-Always return a valid JSON object with the exact structure requested. Do not include any markdown formatting or extra text."""
+    # First, extract video ID
+    video_id = extract_video_id(video_url, platform)
     
-    prompt = f"""Given this {platform} video URL: {video_url}
+    # Get actual video content (transcript, title, description)
+    logger.info(f"Fetching video content from {platform} for URL: {video_url}")
+    video_content = await get_video_content(video_url, platform, video_id)
+    
+    # Build context for AI
+    context_parts = []
+    
+    if video_content.get('title'):
+        context_parts.append(f"Video Title: {video_content['title']}")
+    
+    if video_content.get('uploader'):
+        context_parts.append(f"Creator: {video_content['uploader']}")
+    
+    if video_content.get('transcript'):
+        # Limit transcript to avoid token limits (first 8000 chars)
+        transcript = video_content['transcript'][:8000]
+        context_parts.append(f"Video Transcript/Captions:\n{transcript}")
+    
+    if video_content.get('description'):
+        # Limit description to first 2000 chars
+        description = video_content['description'][:2000]
+        context_parts.append(f"Video Description:\n{description}")
+    
+    # Check if we have any content
+    has_content = bool(context_parts)
+    
+    if has_content:
+        video_context = "\n\n".join(context_parts)
+        logger.info(f"Successfully extracted video content. Transcript: {bool(video_content.get('transcript'))}, Title: {bool(video_content.get('title'))}")
+    else:
+        video_context = f"No content could be extracted from this {platform} video URL: {video_url}"
+        logger.warning(f"No content could be extracted from video: {video_url}")
+    
+    system_message = """You are a recipe extraction AI expert. Your job is to analyze video content (transcripts, titles, descriptions) and extract the exact recipe being shown.
 
-Please analyze this recipe video and extract the following information. Generate a realistic and delicious recipe that might be featured in this {platform} cooking video.
+IMPORTANT RULES:
+1. Extract the ACTUAL recipe from the provided content - do NOT make up or guess recipes
+2. If the content clearly shows a recipe, extract all ingredients with precise quantities
+3. If the content is not about cooking/recipes, indicate that in your response
+4. Return valid JSON only, no markdown formatting
+5. Be accurate with ingredient quantities and names as mentioned in the video"""
+    
+    prompt = f"""Analyze the following {platform} video content and extract the recipe information.
 
-Return ONLY a JSON object with this exact structure (no markdown, no extra text):
+{video_context}
+
+Based on this content, extract the recipe details. Return ONLY a JSON object with this exact structure (no markdown, no extra text):
 {{
-    "title": "Recipe name",
+    "title": "Exact recipe name from the video",
     "servings": 4,
+    "prep_time": "X mins",
+    "cook_time": "X mins", 
+    "ingredients": [
+        {{
+            "name": "ingredient name",
+            "quantity": "amount",
+            "unit": "unit of measurement",
+            "category": "one of: produce, dairy, meat, pantry, frozen, bakery, beverages, other"
+        }}
+    ],
+    "instructions": [
+        "Step 1: ...",
+        "Step 2: ..."
+    ],
+    "is_recipe": true
+}}
+
+If the video content is NOT about a recipe or you cannot determine the recipe, return:
+{{
+    "title": "Unknown",
+    "is_recipe": false,
+    "error": "This video does not appear to contain a recipe"
+}}"""
+
+    try:
+        # Create LlmChat instance with OpenAI model
+        llm = LlmChat(
+            api_key=EMERGENT_API_KEY,
+            session_id=str(uuid.uuid4()),
+            system_message=system_message
+        ).with_model("openai", "gpt-4o")
+        
+        # Send message and get response
+        user_msg = UserMessage(text=prompt)
+        response = await llm.send_message(user_msg)
+        
+        # Parse JSON from response
+        response_text = response.strip()
+        
+        # Remove markdown code blocks if present
+        if response_text.startswith('```'):
+            lines = response_text.split('\n')
+            # Find the actual JSON content
+            json_lines = []
+            in_json = False
+            for line in lines:
+                if line.startswith('```') and not in_json:
+                    in_json = True
+                    continue
+                elif line.startswith('```') and in_json:
+                    break
+                elif in_json:
+                    json_lines.append(line)
+            response_text = '\n'.join(json_lines)
+        
+        # Find JSON object in response
+        json_start = response_text.find('{')
+        json_end = response_text.rfind('}') + 1
+        if json_start != -1 and json_end > json_start:
+            json_str = response_text[json_start:json_end]
+            result = json.loads(json_str)
+            
+            # Check if it's actually a recipe
+            if result.get('is_recipe') == False:
+                raise HTTPException(
+                    status_code=400, 
+                    detail=result.get('error', 'This video does not contain a recipe')
+                )
+            
+            return result
+        else:
+            raise ValueError("No JSON found in response")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"AI extraction error: {e}")
+        
+        # If we had content but AI failed, provide more specific error
+        if has_content:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Failed to extract recipe from video content. Please try a different video."
+            )
+        else:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Could not access video content. Please ensure the video is public and contains a recipe."
+            )
     "prep_time": "15 mins",
     "cook_time": "30 mins",
     "ingredients": [
