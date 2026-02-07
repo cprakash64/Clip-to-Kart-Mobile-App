@@ -212,24 +212,13 @@ def extract_video_id(url: str, platform: str) -> Optional[str]:
 async def get_youtube_transcript(video_id: str) -> Optional[str]:
     """Fetch transcript/captions from YouTube video"""
     try:
-        # Try to get transcript in various languages
-        transcript_list = YouTubeTranscriptApi.list_transcripts(video_id)
+        # Use the new API - create instance and fetch
+        api = YouTubeTranscriptApi()
+        transcript_data = api.fetch(video_id, languages=['en', 'en-US', 'en-GB', 'es', 'fr', 'de'])
         
-        # Try English first, then any available transcript
-        transcript = None
-        try:
-            transcript = transcript_list.find_transcript(['en', 'en-US', 'en-GB'])
-        except:
-            # Get first available transcript and translate if needed
-            for t in transcript_list:
-                transcript = t
-                break
-        
-        if transcript:
-            transcript_data = transcript.fetch()
-            # Combine all text segments
-            full_text = ' '.join([segment['text'] for segment in transcript_data])
-            return full_text
+        # Combine all text segments
+        full_text = ' '.join([segment.text for segment in transcript_data])
+        return full_text
             
     except (TranscriptsDisabled, NoTranscriptFound) as e:
         logger.warning(f"No transcript available for YouTube video {video_id}: {e}")
