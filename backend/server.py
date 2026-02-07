@@ -231,7 +231,7 @@ async def get_youtube_video_info(video_id: str) -> Dict[str, Any]:
     """Get YouTube video title, description using yt-dlp"""
     try:
         result = subprocess.run(
-            ['yt-dlp', '--dump-json', '--no-download', f'https://www.youtube.com/watch?v={video_id}'],
+            ['/root/.venv/bin/yt-dlp', '--dump-json', '--no-download', f'https://www.youtube.com/watch?v={video_id}'],
             capture_output=True,
             text=True,
             timeout=30
