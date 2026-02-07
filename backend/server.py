@@ -15,6 +15,11 @@ import bcrypt
 import json
 import re
 from emergentintegrations.llm.chat import LlmChat, UserMessage
+from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
+import httpx
+from bs4 import BeautifulSoup
+import subprocess
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
