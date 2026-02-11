@@ -40,14 +40,6 @@
           "resizeMode": "contain",
           "backgroundColor": "#1A1A2E"
         }
-      ],
-      [
-        "react-native-purchases",
-        {
-          "ios": {
-            "usesStoreKit2IfAvailable": true
-          }
-        }
       ]
     ],
     "experiments": {
