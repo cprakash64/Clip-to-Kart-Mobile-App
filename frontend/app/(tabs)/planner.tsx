@@ -7,11 +7,13 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useRevenueCat } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -20,12 +22,16 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 export default function PlannerScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { isChefPlan: rcIsChefPlan, purchasing, purchaseChefPlan } = useRevenueCat();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [mealPlan, setMealPlan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
-  const isChefPlan = user?.subscription_plan === 'chef';
+  // Use RevenueCat status on mobile, fallback to backend status on web
+  const isChefPlan = Platform.OS === 'web' 
+    ? user?.subscription_plan === 'chef' 
+    : rcIsChefPlan || user?.subscription_plan === 'chef';
 
   useFocusEffect(
     useCallback(() => {
