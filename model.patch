@@ -1,338 +1,343 @@
-diff --git a/backend/server.py b/backend/server.py
-index 1a9bd0c..ddbb37f 100644
---- a/backend/server.py
-+++ b/backend/server.py
-@@ -102,6 +102,23 @@ class RecipeExtractRequest(BaseModel):
- class UpgradeRequest(BaseModel):
-     plan: str  # "chef"
- 
-+# ==================== HELPERS ====================
-+
-+def convert_mongo_doc(doc):
-+    """Convert MongoDB document to JSON-serializable format"""
-+    if doc is None:
-+        return None
-+    if isinstance(doc, list):
-+        return [convert_mongo_doc(item) for item in doc]
-+    if isinstance(doc, dict):
-+        result = {}
-+        for key, value in doc.items():
-+            if key == '_id':
-+                continue  # Skip MongoDB _id field
-+            result[key] = convert_mongo_doc(value)
-+        return result
-+    return doc
-+
- # ==================== AUTH HELPERS ====================
- 
- def hash_password(password: str) -> str:
-@@ -410,14 +427,14 @@ async def extract_recipe(request: RecipeExtractRequest, user: User = Depends(get
- @api_router.get("/recipes")
- async def get_recipes(user: User = Depends(get_current_user)):
-     recipes = await db.recipes.find({"user_id": user.id}).sort("created_at", -1).to_list(100)
--    return recipes
-+    return convert_mongo_doc(recipes)
- 
- @api_router.get("/recipes/{recipe_id}")
- async def get_recipe(recipe_id: str, user: User = Depends(get_current_user)):
-     recipe = await db.recipes.find_one({"id": recipe_id, "user_id": user.id})
-     if not recipe:
-         raise HTTPException(status_code=404, detail="Recipe not found")
--    return recipe
-+    return convert_mongo_doc(recipe)
- 
- @api_router.delete("/recipes/{recipe_id}")
- async def delete_recipe(recipe_id: str, user: User = Depends(get_current_user)):
-@@ -484,7 +501,7 @@ async def get_meal_plan(start_date: str = None, end_date: str = None, user: User
-             query["date"] = {"$lte": end_date}
-     
-     entries = await db.meal_plans.find(query).sort("date", 1).to_list(100)
--    return entries
-+    return convert_mongo_doc(entries)
- 
- @api_router.delete("/meal-plan/{entry_id}")
- async def remove_from_meal_plan(entry_id: str, user: User = Depends(get_current_user)):
-diff --git a/debug_test.py b/debug_test.py
-new file mode 100644
-index 0000000..c816eb9
---- /dev/null
-+++ b/debug_test.py
-@@ -0,0 +1,67 @@
-+#!/usr/bin/env python3
-+"""
-+Debug specific failing endpoints
-+"""
-+
-+import requests
-+import json
-+
-+BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
-+
-+def debug_endpoints():
-+    # First register a user to get auth token
-+    test_data = {
-+        "email": "debuguser@example.com",
-+        "password": "SecurePassword123!",
-+        "name": "Debug User"
-+    }
-+    
-+    response = requests.post(f"{BACKEND_URL}/auth/register", json=test_data)
-+    if response.status_code != 200:
-+        print("Failed to register user for debugging")
-+        return
-+    
-+    auth_token = response.json()["token"]
-+    headers = {"Authorization": f"Bearer {auth_token}"}
-+    
-+    # Test get recipes endpoint
-+    print("=== Testing GET /recipes ===")
-+    response = requests.get(f"{BACKEND_URL}/recipes", headers=headers)
-+    print(f"Status Code: {response.status_code}")
-+    print(f"Headers: {dict(response.headers)}")
-+    print(f"Raw Content: {response.content}")
-+    print(f"Text: {response.text}")
-+    
-+    # Create a recipe first
-+    print("\n=== Creating a recipe first ===")
-+    extract_data = {"video_url": "https://www.youtube.com/watch?v=test"}
-+    response = requests.post(f"{BACKEND_URL}/recipes/extract", json=extract_data, headers=headers)
-+    print(f"Extract Status: {response.status_code}")
-+    if response.status_code == 200:
-+        recipe_data = response.json()
-+        recipe_id = recipe_data["id"]
-+        print(f"Created recipe ID: {recipe_id}")
-+        
-+        # Now test get recipes again
-+        print("\n=== Testing GET /recipes after creating recipe ===")
-+        response = requests.get(f"{BACKEND_URL}/recipes", headers=headers)
-+        print(f"Status Code: {response.status_code}")
-+        print(f"Raw Content: {response.content}")
-+        print(f"Text: {response.text}")
-+        
-+        # Test get single recipe
-+        print(f"\n=== Testing GET /recipes/{recipe_id} ===")
-+        response = requests.get(f"{BACKEND_URL}/recipes/{recipe_id}", headers=headers)
-+        print(f"Status Code: {response.status_code}")
-+        print(f"Raw Content: {response.content}")
-+        print(f"Text: {response.text}")
-+        
-+        # Test meal plan
-+        print(f"\n=== Testing GET /meal-plan ===")
-+        response = requests.get(f"{BACKEND_URL}/meal-plan", headers=headers)
-+        print(f"Status Code: {response.status_code}")
-+        print(f"Raw Content: {response.content}")
-+        print(f"Text: {response.text}")
-+
-+if __name__ == "__main__":
-+    debug_endpoints()
-\ No newline at end of file
-diff --git a/simple_test.py b/simple_test.py
-new file mode 100644
-index 0000000..ed0ebe9
---- /dev/null
-+++ b/simple_test.py
-@@ -0,0 +1,38 @@
-+#!/usr/bin/env python3
-+"""
-+Simple debug test
-+"""
-+
-+import requests
-+import json
-+import time
-+
-+BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
-+
-+def simple_test():
-+    # Test health first
-+    response = requests.get(f"{BACKEND_URL}/health")
-+    print(f"Health: {response.status_code} - {response.text}")
-+    
-+    # Test registration with unique email
-+    test_data = {
-+        "email": f"debuguser_{int(time.time())}@example.com",
-+        "password": "SecurePassword123!",
-+        "name": "Debug User"
-+    }
-+    
-+    response = requests.post(f"{BACKEND_URL}/auth/register", json=test_data)
-+    print(f"Register: {response.status_code}")
-+    if response.status_code != 200:
-+        print(f"Register error: {response.text}")
-+        return
-+    
-+    auth_token = response.json()["token"]
-+    headers = {"Authorization": f"Bearer {auth_token}"}
-+    
-+    # Test get recipes (should be empty)
-+    response = requests.get(f"{BACKEND_URL}/recipes", headers=headers)
-+    print(f"Get recipes: {response.status_code} - {response.text}")
-+
-+if __name__ == "__main__":
-+    simple_test()
-\ No newline at end of file
-diff --git a/test_result.md b/test_result.md
-index a484f84..7a7921b 100644
---- a/test_result.md
-+++ b/test_result.md
-@@ -107,99 +107,123 @@ user_problem_statement: "Build Clip-to-Cart app - paste video links from TikTok/
- backend:
-   - task: "User Registration"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "high"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Implemented JWT-based auth with email/password registration"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: User registration working correctly. Creates user with JWT token, validates email uniqueness, returns proper user data with subscription plan."
- 
-   - task: "User Login"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "high"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "JWT login with token generation"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: User login working correctly. Validates credentials, generates JWT token, returns user data. Monthly recipe counter resets properly."
- 
-   - task: "Recipe Extraction with AI"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "high"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Using Emergent LLM key with GPT-4o to extract ingredients from video URLs"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: AI recipe extraction working perfectly. Successfully extracts recipes from YouTube, TikTok, and Instagram URLs. GPT-4o integration via Emergent API working. Properly rejects invalid platform URLs. Respects subscription limits (5 recipes/month for normal plan)."
- 
-   - task: "Get Recipes List"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "high"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Returns all recipes for authenticated user"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: Get recipes endpoint working correctly. Returns user's recipes in descending order by creation date. Fixed MongoDB ObjectId serialization issue during testing."
- 
-   - task: "Delete Recipe"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "medium"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Delete recipe by ID"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: Recipe deletion working correctly. Properly validates user ownership and returns success message."
- 
-   - task: "Toggle Ingredient Checked"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "medium"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Toggle checked state for grocery list items"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: Ingredient toggle working correctly. Successfully toggles checked state and returns updated status."
- 
-   - task: "Subscription Upgrade"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "medium"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Mock upgrade to Chef plan"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: Subscription upgrade working correctly. Successfully upgrades user to Chef plan. Note: This is MOCKED implementation - no actual payment processing."
- 
-   - task: "Meal Plan CRUD"
-     implemented: true
--    working: NA
-+    working: true
-     file: "/app/backend/server.py"
-     stuck_count: 0
-     priority: "medium"
--    needs_retesting: true
-+    needs_retesting: false
-     status_history:
-       - working: NA
-         agent: "main"
-         comment: "Add/get/remove meal plan entries (Chef plan only)"
-+      - working: true
-+        agent: "testing"
-+        comment: "✅ TESTED: Meal planning CRUD operations working correctly. Add, get, and delete meal plan entries. Properly enforces Chef plan requirement. Fixed MongoDB ObjectId serialization issue during testing."
- 
- frontend:
-   - task: "Auth Screens (Login/Register)"
-@@ -269,16 +293,13 @@ metadata:
-   run_ui: false
- 
- test_plan:
--  current_focus:
--    - "User Registration"
--    - "User Login"
--    - "Recipe Extraction with AI"
--    - "Get Recipes List"
--    - "Subscription Upgrade"
-+  current_focus: []
-   stuck_tasks: []
--  test_all: true
-+  test_all: false
-   test_priority: "high_first"
- 
- agent_communication:
-   - agent: "main"
-     message: "MVP implementation complete. Backend has auth, recipe extraction with AI (GPT-4o via Emergent), subscription management, and meal planning. Please test all backend endpoints. Authentication uses JWT tokens. Test user registration, login, recipe extraction with YouTube/TikTok/Instagram URLs, and subscription upgrade."
-+  - agent: "testing"
-+    message: "✅ BACKEND TESTING COMPLETE: All 8 backend tasks tested successfully with 100% pass rate. Fixed MongoDB ObjectId serialization issue during testing. All endpoints working correctly including auth, AI recipe extraction, subscription management, and meal planning. GPT-4o integration via Emergent API working perfectly. Subscription upgrade is MOCKED (no payment processing). Ready for frontend testing or production deployment."
+diff --git a/model.patch b/model.patch
+index 442e129..e69de29 100644
+--- a/model.patch
++++ b/model.patch
+@@ -1,338 +0,0 @@
+-diff --git a/backend/server.py b/backend/server.py
+-index 1a9bd0c..ddbb37f 100644
+---- a/backend/server.py
+-+++ b/backend/server.py
+-@@ -102,6 +102,23 @@ class RecipeExtractRequest(BaseModel):
+- class UpgradeRequest(BaseModel):
+-     plan: str  # "chef"
+- 
+-+# ==================== HELPERS ====================
+-+
+-+def convert_mongo_doc(doc):
+-+    """Convert MongoDB document to JSON-serializable format"""
+-+    if doc is None:
+-+        return None
+-+    if isinstance(doc, list):
+-+        return [convert_mongo_doc(item) for item in doc]
+-+    if isinstance(doc, dict):
+-+        result = {}
+-+        for key, value in doc.items():
+-+            if key == '_id':
+-+                continue  # Skip MongoDB _id field
+-+            result[key] = convert_mongo_doc(value)
+-+        return result
+-+    return doc
+-+
+- # ==================== AUTH HELPERS ====================
+- 
+- def hash_password(password: str) -> str:
+-@@ -410,14 +427,14 @@ async def extract_recipe(request: RecipeExtractRequest, user: User = Depends(get
+- @api_router.get("/recipes")
+- async def get_recipes(user: User = Depends(get_current_user)):
+-     recipes = await db.recipes.find({"user_id": user.id}).sort("created_at", -1).to_list(100)
+--    return recipes
+-+    return convert_mongo_doc(recipes)
+- 
+- @api_router.get("/recipes/{recipe_id}")
+- async def get_recipe(recipe_id: str, user: User = Depends(get_current_user)):
+-     recipe = await db.recipes.find_one({"id": recipe_id, "user_id": user.id})
+-     if not recipe:
+-         raise HTTPException(status_code=404, detail="Recipe not found")
+--    return recipe
+-+    return convert_mongo_doc(recipe)
+- 
+- @api_router.delete("/recipes/{recipe_id}")
+- async def delete_recipe(recipe_id: str, user: User = Depends(get_current_user)):
+-@@ -484,7 +501,7 @@ async def get_meal_plan(start_date: str = None, end_date: str = None, user: User
+-             query["date"] = {"$lte": end_date}
+-     
+-     entries = await db.meal_plans.find(query).sort("date", 1).to_list(100)
+--    return entries
+-+    return convert_mongo_doc(entries)
+- 
+- @api_router.delete("/meal-plan/{entry_id}")
+- async def remove_from_meal_plan(entry_id: str, user: User = Depends(get_current_user)):
+-diff --git a/debug_test.py b/debug_test.py
+-new file mode 100644
+-index 0000000..c816eb9
+---- /dev/null
+-+++ b/debug_test.py
+-@@ -0,0 +1,67 @@
+-+#!/usr/bin/env python3
+-+"""
+-+Debug specific failing endpoints
+-+"""
+-+
+-+import requests
+-+import json
+-+
+-+BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+-+
+-+def debug_endpoints():
+-+    # First register a user to get auth token
+-+    test_data = {
+-+        "email": "debuguser@example.com",
+-+        "password": "SecurePassword123!",
+-+        "name": "Debug User"
+-+    }
+-+    
+-+    response = requests.post(f"{BACKEND_URL}/auth/register", json=test_data)
+-+    if response.status_code != 200:
+-+        print("Failed to register user for debugging")
+-+        return
+-+    
+-+    auth_token = response.json()["token"]
+-+    headers = {"Authorization": f"Bearer {auth_token}"}
+-+    
+-+    # Test get recipes endpoint
+-+    print("=== Testing GET /recipes ===")
+-+    response = requests.get(f"{BACKEND_URL}/recipes", headers=headers)
+-+    print(f"Status Code: {response.status_code}")
+-+    print(f"Headers: {dict(response.headers)}")
+-+    print(f"Raw Content: {response.content}")
+-+    print(f"Text: {response.text}")
+-+    
+-+    # Create a recipe first
+-+    print("\n=== Creating a recipe first ===")
+-+    extract_data = {"video_url": "https://www.youtube.com/watch?v=test"}
+-+    response = requests.post(f"{BACKEND_URL}/recipes/extract", json=extract_data, headers=headers)
+-+    print(f"Extract Status: {response.status_code}")
+-+    if response.status_code == 200:
+-+        recipe_data = response.json()
+-+        recipe_id = recipe_data["id"]
+-+        print(f"Created recipe ID: {recipe_id}")
+-+        
+-+        # Now test get recipes again
+-+        print("\n=== Testing GET /recipes after creating recipe ===")
+-+        response = requests.get(f"{BACKEND_URL}/recipes", headers=headers)
+-+        print(f"Status Code: {response.status_code}")
+-+        print(f"Raw Content: {response.content}")
+-+        print(f"Text: {response.text}")
+-+        
+-+        # Test get single recipe
+-+        print(f"\n=== Testing GET /recipes/{recipe_id} ===")
+-+        response = requests.get(f"{BACKEND_URL}/recipes/{recipe_id}", headers=headers)
+-+        print(f"Status Code: {response.status_code}")
+-+        print(f"Raw Content: {response.content}")
+-+        print(f"Text: {response.text}")
+-+        
+-+        # Test meal plan
+-+        print(f"\n=== Testing GET /meal-plan ===")
+-+        response = requests.get(f"{BACKEND_URL}/meal-plan", headers=headers)
+-+        print(f"Status Code: {response.status_code}")
+-+        print(f"Raw Content: {response.content}")
+-+        print(f"Text: {response.text}")
+-+
+-+if __name__ == "__main__":
+-+    debug_endpoints()
+-\ No newline at end of file
+-diff --git a/simple_test.py b/simple_test.py
+-new file mode 100644
+-index 0000000..ed0ebe9
+---- /dev/null
+-+++ b/simple_test.py
+-@@ -0,0 +1,38 @@
+-+#!/usr/bin/env python3
+-+"""
+-+Simple debug test
+-+"""
+-+
+-+import requests
+-+import json
+-+import time
+-+
+-+BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+-+
+-+def simple_test():
+-+    # Test health first
+-+    response = requests.get(f"{BACKEND_URL}/health")
+-+    print(f"Health: {response.status_code} - {response.text}")
+-+    
+-+    # Test registration with unique email
+-+    test_data = {
+-+        "email": f"debuguser_{int(time.time())}@example.com",
+-+        "password": "SecurePassword123!",
+-+        "name": "Debug User"
+-+    }
+-+    
+-+    response = requests.post(f"{BACKEND_URL}/auth/register", json=test_data)
+-+    print(f"Register: {response.status_code}")
+-+    if response.status_code != 200:
+-+        print(f"Register error: {response.text}")
+-+        return
+-+    
+-+    auth_token = response.json()["token"]
+-+    headers = {"Authorization": f"Bearer {auth_token}"}
+-+    
+-+    # Test get recipes (should be empty)
+-+    response = requests.get(f"{BACKEND_URL}/recipes", headers=headers)
+-+    print(f"Get recipes: {response.status_code} - {response.text}")
+-+
+-+if __name__ == "__main__":
+-+    simple_test()
+-\ No newline at end of file
+-diff --git a/test_result.md b/test_result.md
+-index a484f84..7a7921b 100644
+---- a/test_result.md
+-+++ b/test_result.md
+-@@ -107,99 +107,123 @@ user_problem_statement: "Build Clip-to-Cart app - paste video links from TikTok/
+- backend:
+-   - task: "User Registration"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "high"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Implemented JWT-based auth with email/password registration"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: User registration working correctly. Creates user with JWT token, validates email uniqueness, returns proper user data with subscription plan."
+- 
+-   - task: "User Login"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "high"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "JWT login with token generation"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: User login working correctly. Validates credentials, generates JWT token, returns user data. Monthly recipe counter resets properly."
+- 
+-   - task: "Recipe Extraction with AI"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "high"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Using Emergent LLM key with GPT-4o to extract ingredients from video URLs"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: AI recipe extraction working perfectly. Successfully extracts recipes from YouTube, TikTok, and Instagram URLs. GPT-4o integration via Emergent API working. Properly rejects invalid platform URLs. Respects subscription limits (5 recipes/month for normal plan)."
+- 
+-   - task: "Get Recipes List"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "high"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Returns all recipes for authenticated user"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: Get recipes endpoint working correctly. Returns user's recipes in descending order by creation date. Fixed MongoDB ObjectId serialization issue during testing."
+- 
+-   - task: "Delete Recipe"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "medium"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Delete recipe by ID"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: Recipe deletion working correctly. Properly validates user ownership and returns success message."
+- 
+-   - task: "Toggle Ingredient Checked"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "medium"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Toggle checked state for grocery list items"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: Ingredient toggle working correctly. Successfully toggles checked state and returns updated status."
+- 
+-   - task: "Subscription Upgrade"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "medium"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Mock upgrade to Chef plan"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: Subscription upgrade working correctly. Successfully upgrades user to Chef plan. Note: This is MOCKED implementation - no actual payment processing."
+- 
+-   - task: "Meal Plan CRUD"
+-     implemented: true
+--    working: NA
+-+    working: true
+-     file: "/app/backend/server.py"
+-     stuck_count: 0
+-     priority: "medium"
+--    needs_retesting: true
+-+    needs_retesting: false
+-     status_history:
+-       - working: NA
+-         agent: "main"
+-         comment: "Add/get/remove meal plan entries (Chef plan only)"
+-+      - working: true
+-+        agent: "testing"
+-+        comment: "✅ TESTED: Meal planning CRUD operations working correctly. Add, get, and delete meal plan entries. Properly enforces Chef plan requirement. Fixed MongoDB ObjectId serialization issue during testing."
+- 
+- frontend:
+-   - task: "Auth Screens (Login/Register)"
+-@@ -269,16 +293,13 @@ metadata:
+-   run_ui: false
+- 
+- test_plan:
+--  current_focus:
+--    - "User Registration"
+--    - "User Login"
+--    - "Recipe Extraction with AI"
+--    - "Get Recipes List"
+--    - "Subscription Upgrade"
+-+  current_focus: []
+-   stuck_tasks: []
+--  test_all: true
+-+  test_all: false
+-   test_priority: "high_first"
+- 
+- agent_communication:
+-   - agent: "main"
+-     message: "MVP implementation complete. Backend has auth, recipe extraction with AI (GPT-4o via Emergent), subscription management, and meal planning. Please test all backend endpoints. Authentication uses JWT tokens. Test user registration, login, recipe extraction with YouTube/TikTok/Instagram URLs, and subscription upgrade."
+-+  - agent: "testing"
+-+    message: "✅ BACKEND TESTING COMPLETE: All 8 backend tasks tested successfully with 100% pass rate. Fixed MongoDB ObjectId serialization issue during testing. All endpoints working correctly including auth, AI recipe extraction, subscription management, and meal planning. GPT-4o integration via Emergent API working perfectly. Subscription upgrade is MOCKED (no payment processing). Ready for frontend testing or production deployment."
