@@ -27,15 +27,15 @@ load_dotenv(ROOT_DIR / '.env')
 # MongoDB connection
 mongo_url = os.environ['MONGO_URL']
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ.get('DB_NAME', 'clip_to_cart')]
+db = client[os.environ['DB_NAME']]
 
 # JWT Configuration
-JWT_SECRET = os.environ.get('JWT_SECRET', 'clip-to-cart-secret-key-2024')
+JWT_SECRET = os.environ['JWT_SECRET']
 JWT_ALGORITHM = 'HS256'
 JWT_EXPIRATION_HOURS = 24 * 7  # 1 week
 
 # Emergent LLM Key
-EMERGENT_API_KEY = os.environ.get('EMERGENT_API_KEY', '')
+EMERGENT_API_KEY = os.environ['EMERGENT_API_KEY']
 
 # Create the main app
 app = FastAPI(title="Clip-to-Cart API")
