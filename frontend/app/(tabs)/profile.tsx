@@ -7,45 +7,104 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
+import { useRevenueCat } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const { user, logout, refreshUser } = useAuth();
+  const { 
+    isChefPlan: rcIsChefPlan, 
+    purchasing, 
+    purchaseChefPlan, 
+    restorePurchases,
+    offerings,
+    loading: rcLoading 
+  } = useRevenueCat();
+  
   const [upgrading, setUpgrading] = useState(false);
 
-  const isChefPlan = user?.subscription_plan === 'chef';
+  // Use RevenueCat status on mobile, fallback to backend status on web
+  const isChefPlan = Platform.OS === 'web' 
+    ? user?.subscription_plan === 'chef' 
+    : rcIsChefPlan || user?.subscription_plan === 'chef';
+  
   const recipesUsed = user?.recipes_used_this_month || 0;
   const recipesLimit = isChefPlan ? 'Unlimited' : 5;
 
-  const handleUpgrade = async () => {
-    Alert.alert(
-      'Upgrade to Chef Plan',
-      'Get unlimited recipe extractions and meal planning for $9.99/month!\n\nNote: This is a demo - no actual payment will be processed.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Upgrade Now',
-          onPress: async () => {
-            setUpgrading(true);
-            try {
-              await api.upgradeSubscription('chef');
-              await refreshUser();
-              Alert.alert('Success!', 'You are now on the Chef plan!');
-            } catch (error: any) {
-              Alert.alert('Error', error.message || 'Failed to upgrade');
-            } finally {
-              setUpgrading(false);
-            }
+  // Get price from RevenueCat offerings
+  const getPrice = () => {
+    if (Platform.OS === 'web') return '$9.99';
+    const pkg = offerings?.current?.availablePackages?.[0];
+    if (pkg) {
+      return pkg.product.priceString || `$${pkg.product.price}`;
+    }
+    return '$9.99';
+  };
+
+  const handlePurchase = async () => {
+    if (Platform.OS === 'web') {
+      // Web fallback - use mock upgrade
+      Alert.alert(
+        'Subscribe on Mobile',
+        'In-app purchases are available on the iOS and Android apps. For now, you can try the Chef Plan features with a demo upgrade.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Demo Upgrade',
+            onPress: async () => {
+              setUpgrading(true);
+              try {
+                await api.upgradeSubscription('chef');
+                await refreshUser();
+                Alert.alert('Success!', 'Demo Chef Plan activated!');
+              } catch (error: any) {
+                Alert.alert('Error', error.message || 'Failed to upgrade');
+              } finally {
+                setUpgrading(false);
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+      return;
+    }
+
+    // Use RevenueCat for mobile purchases
+    const success = await purchaseChefPlan();
+    if (success) {
+      // Also update backend to sync subscription status
+      try {
+        await api.upgradeSubscription('chef');
+        await refreshUser();
+      } catch (error) {
+        console.log('Backend sync will happen via webhook');
+      }
+      Alert.alert(
+        'Welcome to Chef Plan!',
+        'You now have unlimited recipe extractions, meal planning, and more!',
+        [{ text: 'Awesome!' }]
+      );
+    }
+  };
+
+  const handleRestore = async () => {
+    const success = await restorePurchases();
+    if (success) {
+      // Sync with backend
+      try {
+        await api.upgradeSubscription('chef');
+        await refreshUser();
+      } catch (error) {
+        console.log('Backend sync will happen via webhook');
+      }
+    }
   };
 
   const handleLogout = () => {
@@ -77,13 +136,13 @@ export default function ProfileScreen() {
           </View>
           <Text style={styles.userName}>{user?.name}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
-          <View style={styles.planBadge}>
+          <View style={[styles.planBadge, isChefPlan && styles.chefPlanBadge]}>
             <Ionicons
               name={isChefPlan ? 'star' : 'person'}
               size={14}
-              color="#FFF"
+              color={isChefPlan ? '#FFD700' : '#FFF'}
             />
-            <Text style={styles.planBadgeText}>
+            <Text style={[styles.planBadgeText, isChefPlan && styles.chefPlanBadgeText]}>
               {isChefPlan ? 'Chef Plan' : 'Normal Plan'}
             </Text>
           </View>
@@ -120,23 +179,48 @@ export default function ProfileScreen() {
                 <Text style={styles.upgradeFeatureText}>Meal planning</Text>
               </View>
               <View style={styles.upgradeFeatureItem}>
+                <Ionicons name="cart" size={16} color="#4CAF50" />
+                <Text style={styles.upgradeFeatureText}>Add to Cart feature</Text>
+              </View>
+              <View style={styles.upgradeFeatureItem}>
                 <Ionicons name="download" size={16} color="#4CAF50" />
-                <Text style={styles.upgradeFeatureText}>Export lists</Text>
+                <Text style={styles.upgradeFeatureText}>Export grocery lists</Text>
               </View>
             </View>
+
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceText}>{getPrice()}</Text>
+              <Text style={styles.pricePeriod}>/month</Text>
+            </View>
+
             <TouchableOpacity
-              style={styles.upgradeButton}
-              onPress={handleUpgrade}
-              disabled={upgrading}
+              style={[styles.upgradeButton, (purchasing || upgrading) && styles.buttonDisabled]}
+              onPress={handlePurchase}
+              disabled={purchasing || upgrading || rcLoading}
             >
-              {upgrading ? (
+              {(purchasing || upgrading) ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
-                  <Text style={styles.upgradeButtonText}>Upgrade for $9.99/mo</Text>
+                  <Ionicons name="card" size={20} color="#FFF" />
+                  <Text style={styles.upgradeButtonText}>Subscribe Now</Text>
                 </>
               )}
             </TouchableOpacity>
+
+            {Platform.OS !== 'web' && (
+              <TouchableOpacity
+                style={styles.restoreButton}
+                onPress={handleRestore}
+                disabled={rcLoading}
+              >
+                <Text style={styles.restoreButtonText}>Restore Purchases</Text>
+              </TouchableOpacity>
+            )}
+
+            <Text style={styles.legalText}>
+              Subscription automatically renews monthly. Cancel anytime in {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} settings.
+            </Text>
           </View>
         )}
 
@@ -144,7 +228,7 @@ export default function ProfileScreen() {
           <View style={styles.chefBenefits}>
             <View style={styles.benefitHeader}>
               <Ionicons name="star" size={20} color="#FFD700" />
-              <Text style={styles.benefitTitle}>Chef Plan Benefits</Text>
+              <Text style={styles.benefitTitle}>Chef Plan Active</Text>
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
@@ -156,12 +240,20 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+              <Text style={styles.benefitText}>Add to Cart feature</Text>
+            </View>
+            <View style={styles.benefitItem}>
+              <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
               <Text style={styles.benefitText}>Export grocery lists</Text>
             </View>
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
               <Text style={styles.benefitText}>Priority support</Text>
             </View>
+
+            <Text style={styles.manageText}>
+              Manage subscription in {Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Google Play' : 'your account'} settings
+            </Text>
           </View>
         )}
 
@@ -252,10 +344,18 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
   },
+  chefPlanBadge: {
+    backgroundColor: 'rgba(255, 215, 0, 0.2)',
+    borderWidth: 1,
+    borderColor: '#FFD700',
+  },
   planBadgeText: {
     color: '#FFF',
     fontSize: 12,
     fontWeight: '600',
+  },
+  chefPlanBadgeText: {
+    color: '#FFD700',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -289,7 +389,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
-    borderWidth: 1,
+    borderWidth: 2,
     borderColor: '#FFD700',
   },
   upgradeHeader: {
@@ -321,16 +421,54 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#CCC',
   },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  priceText: {
+    fontSize: 36,
+    fontWeight: 'bold',
+    color: '#FFF',
+  },
+  pricePeriod: {
+    fontSize: 16,
+    color: '#888',
+    marginLeft: 4,
+  },
   upgradeButton: {
     backgroundColor: '#FF6B35',
     borderRadius: 12,
-    paddingVertical: 14,
+    paddingVertical: 16,
     alignItems: 'center',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   upgradeButtonText: {
     color: '#FFF',
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
+  },
+  restoreButton: {
+    paddingVertical: 14,
+    alignItems: 'center',
+  },
+  restoreButtonText: {
+    color: '#888',
+    fontSize: 14,
+    textDecorationLine: 'underline',
+  },
+  legalText: {
+    fontSize: 11,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 8,
+    lineHeight: 16,
   },
   chefBenefits: {
     backgroundColor: '#252542',
@@ -338,6 +476,8 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
   },
   benefitHeader: {
     flexDirection: 'row',
@@ -348,7 +488,7 @@ const styles = StyleSheet.create({
   benefitTitle: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#FFF',
+    color: '#FFD700',
   },
   benefitItem: {
     flexDirection: 'row',
@@ -359,6 +499,12 @@ const styles = StyleSheet.create({
   benefitText: {
     fontSize: 14,
     color: '#CCC',
+  },
+  manageText: {
+    fontSize: 12,
+    color: '#666',
+    textAlign: 'center',
+    marginTop: 12,
   },
   menuSection: {
     backgroundColor: '#252542',
