@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../src/context/AuthContext';
+import { useRevenueCat } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
 
 interface Store {
@@ -34,6 +35,7 @@ interface Recipe {
 export default function CartScreen() {
   const router = useRouter();
   const { user } = useAuth();
+  const { isChefPlan: rcIsChefPlan, purchasing, purchaseChefPlan } = useRevenueCat();
   const [stores, setStores] = useState<Store[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedRecipes, setSelectedRecipes] = useState<Set<string>>(new Set());
@@ -42,7 +44,10 @@ export default function CartScreen() {
   const [exporting, setExporting] = useState(false);
   const [exportedList, setExportedList] = useState<string | null>(null);
 
-  const isChefPlan = user?.subscription_plan === 'chef';
+  // Use RevenueCat status on mobile, fallback to backend status on web
+  const isChefPlan = Platform.OS === 'web' 
+    ? user?.subscription_plan === 'chef' 
+    : rcIsChefPlan || user?.subscription_plan === 'chef';
 
   useFocusEffect(
     useCallback(() => {
