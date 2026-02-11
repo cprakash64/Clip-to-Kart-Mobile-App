@@ -630,6 +630,9 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
   },
+  upgradeButtonDisabled: {
+    opacity: 0.7,
+  },
   upgradeButtonText: {
     color: '#FFF',
     fontSize: 18,
