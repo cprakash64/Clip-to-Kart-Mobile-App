@@ -163,11 +163,23 @@ export default function PlannerScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.upgradeButton}
-            onPress={() => router.push('/(tabs)/profile')}
+            style={[styles.upgradeButton, purchasing && styles.upgradeButtonDisabled]}
+            onPress={async () => {
+              const success = await purchaseChefPlan();
+              if (success) {
+                Alert.alert('Welcome to Chef Plan!', 'You can now use Meal Planning!');
+              }
+            }}
+            disabled={purchasing}
           >
-            <Text style={styles.upgradeButtonText}>Upgrade to Chef Plan</Text>
-            <Text style={styles.upgradePriceText}>$9.99/month</Text>
+            {purchasing ? (
+              <ActivityIndicator color="#FFF" size="small" />
+            ) : (
+              <>
+                <Text style={styles.upgradeButtonText}>Upgrade to Chef Plan</Text>
+                <Text style={styles.upgradePriceText}>$9.99/month</Text>
+              </>
+            )}
           </TouchableOpacity>
         </View>
       </SafeAreaView>
