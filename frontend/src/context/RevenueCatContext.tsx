@@ -8,8 +8,8 @@ import Purchases, {
   PurchasesError
 } from 'react-native-purchases';
 
-// RevenueCat API Keys
-const REVENUECAT_API_KEY = 'test_chmuhTZoReRYWLbLxi0ISSoNHip'; // Test Store key
+// RevenueCat API Keys - loaded from environment
+const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || '';
 
 // Entitlement identifier for Chef Plan
 const CHEF_PLAN_ENTITLEMENT = 'chef_plan';
