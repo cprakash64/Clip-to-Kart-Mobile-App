@@ -1,4 +1,8 @@
-const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL || 'http://localhost:8001';
+const API_BASE_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+
+if (!API_BASE_URL) {
+  console.warn('EXPO_PUBLIC_BACKEND_URL is not set, using default');
+}
 
 class ApiService {
   private token: string | null = null;
