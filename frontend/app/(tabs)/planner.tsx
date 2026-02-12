@@ -29,6 +29,8 @@ export default function PlannerScreen() {
   const [mealPlan, setMealPlan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [currentMonth, setCurrentMonth] = useState(new Date());
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   // Use RevenueCat status on mobile, fallback to backend status on web
   const isChefPlan = Platform.OS === 'web' 
