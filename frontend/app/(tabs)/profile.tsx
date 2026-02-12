@@ -59,29 +59,23 @@ export default function ProfileScreen() {
 
   const handleSubscribe = async () => {
     if (Platform.OS === 'web') {
-      // Web fallback - use demo upgrade
-      Alert.alert(
-        'Subscribe on Mobile',
-        'In-app purchases are available on the iOS and Android apps. For now, you can try the Chef Plan features with a demo upgrade.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Demo Upgrade',
-            onPress: async () => {
-              setUpgrading(true);
-              try {
-                await api.upgradeSubscription('chef');
-                await refreshUser();
-                Alert.alert('Success!', 'Demo Chef Plan activated! Download the mobile app for real subscriptions.');
-              } catch (error: any) {
-                Alert.alert('Error', error.message || 'Failed to upgrade');
-              } finally {
-                setUpgrading(false);
-              }
-            },
-          },
-        ]
+      // Web fallback - use browser confirm dialog for demo upgrade
+      const shouldUpgrade = window.confirm(
+        'In-app purchases are available on the iOS and Android apps.\n\nWould you like to activate a demo Chef Plan to try the features?'
       );
+      
+      if (shouldUpgrade) {
+        setUpgrading(true);
+        try {
+          await api.upgradeSubscription('chef');
+          await refreshUser();
+          window.alert('Success! Demo Chef Plan activated. Download the mobile app for real subscriptions.');
+        } catch (error: any) {
+          window.alert('Error: ' + (error.message || 'Failed to upgrade'));
+        } finally {
+          setUpgrading(false);
+        }
+      }
       return;
     }
 
