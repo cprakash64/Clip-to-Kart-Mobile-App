@@ -15,6 +15,7 @@ import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRevenueCat, useSubscriptionStatus, usePurchaseActions } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
+import SubscriptionModal from '../../src/components/SubscriptionModal';
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -29,6 +30,7 @@ export default function ProfileScreen() {
   const { presentPaywall, restorePurchases, purchasing, hasOfferings } = usePurchaseActions();
   
   const [upgrading, setUpgrading] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   // Use RevenueCat status on mobile, fallback to backend status on web
   const isChefPlan = Platform.OS === 'web' 
@@ -57,28 +59,31 @@ export default function ProfileScreen() {
     return '$9.99';
   };
 
-  const handleSubscribe = async () => {
-    if (Platform.OS === 'web') {
-      // Web fallback - use browser confirm dialog for demo upgrade
-      const shouldUpgrade = window.confirm(
-        'In-app purchases are available on the iOS and Android apps.\n\nWould you like to activate a demo Chef Plan to try the features?'
-      );
-      
-      if (shouldUpgrade) {
-        setUpgrading(true);
-        try {
-          await api.upgradeSubscription('chef');
-          await refreshUser();
-          window.alert('Success! Demo Chef Plan activated. Download the mobile app for real subscriptions.');
-        } catch (error: any) {
-          window.alert('Error: ' + (error.message || 'Failed to upgrade'));
-        } finally {
-          setUpgrading(false);
-        }
-      }
-      return;
-    }
+  const handleSubscribeClick = () => {
+    console.log('Subscribe button clicked');
+    setShowSubscriptionModal(true);
+  };
 
+  const handleDemoUpgrade = async () => {
+    console.log('Demo upgrade clicked');
+    setUpgrading(true);
+    try {
+      await api.upgradeSubscription('chef');
+      await refreshUser();
+      setShowSubscriptionModal(false);
+      Alert.alert('Success!', 'Demo Chef Plan activated! Download the mobile app for real subscriptions.');
+    } catch (error: any) {
+      console.error('Demo upgrade error:', error);
+      Alert.alert('Error', error.message || 'Failed to upgrade');
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const handleMobileSubscribe = async () => {
+    console.log('Mobile subscribe clicked');
+    setShowSubscriptionModal(false);
+    
     // Use RevenueCat Paywall for mobile
     const success = await presentPaywall();
     
@@ -217,7 +222,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity
               style={[styles.subscribeButton, (purchasing || upgrading) && styles.buttonDisabled]}
-              onPress={handleSubscribe}
+              onPress={handleSubscribeClick}
               disabled={purchasing || upgrading}
             >
               {(purchasing || upgrading) ? (
@@ -336,6 +341,16 @@ export default function ProfileScreen() {
 
         <Text style={styles.versionText}>Version 1.0.0</Text>
       </ScrollView>
+
+      {/* Subscription Modal */}
+      <SubscriptionModal
+        visible={showSubscriptionModal}
+        onClose={() => setShowSubscriptionModal(false)}
+        onSubscribe={Platform.OS === 'web' ? handleDemoUpgrade : handleMobileSubscribe}
+        onDemoUpgrade={handleDemoUpgrade}
+        loading={upgrading || purchasing}
+        price={getPrice()}
+      />
     </SafeAreaView>
   );
 }
