@@ -166,8 +166,14 @@ export default function PlannerScreen() {
           <TouchableOpacity
             style={[styles.upgradeButton, purchasing && styles.upgradeButtonDisabled]}
             onPress={async () => {
-              const success = await purchaseChefPlan();
+              const success = await presentPaywall();
               if (success) {
+                try {
+                  await api.upgradeSubscription('chef');
+                  await refreshUser();
+                } catch (e) {
+                  console.log('Backend sync will happen via webhook');
+                }
                 Alert.alert('Welcome to Chef Plan!', 'You can now use Meal Planning!');
               }
             }}
