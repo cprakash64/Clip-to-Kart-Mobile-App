@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useRevenueCat } from '../../src/context/RevenueCatContext';
+import { useRevenueCat, usePurchaseActions } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -21,8 +21,9 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 
 export default function PlannerScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { isChefPlan: rcIsChefPlan, purchasing, purchaseChefPlan } = useRevenueCat();
+  const { user, refreshUser } = useAuth();
+  const { isChefPlan: rcIsChefPlan } = useRevenueCat();
+  const { presentPaywall, purchasing } = usePurchaseActions();
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [mealPlan, setMealPlan] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
