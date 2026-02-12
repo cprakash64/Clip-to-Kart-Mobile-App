@@ -89,14 +89,24 @@ export function RevenueCatProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      console.log('RevenueCat: Initializing with API key:', REVENUECAT_API_KEY.substring(0, 10) + '...');
+      console.log('RevenueCat: Initializing for platform:', Platform.OS);
+      const apiKey = getRevenueCatApiKey();
+      
+      if (!apiKey) {
+        console.warn('RevenueCat: No API key configured for platform:', Platform.OS);
+        setIsInitialized(true);
+        setLoading(false);
+        return;
+      }
+
+      console.log('RevenueCat: Using API key:', apiKey.substring(0, 10) + '...');
 
       // Set log level for debugging
       Purchases.setLogLevel(LOG_LEVEL.DEBUG);
 
       // Configure RevenueCat
       await Purchases.configure({
-        apiKey: REVENUECAT_API_KEY,
+        apiKey: apiKey,
       });
 
       console.log('RevenueCat: SDK configured successfully');
