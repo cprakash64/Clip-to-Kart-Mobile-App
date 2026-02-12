@@ -17,6 +17,7 @@ import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../src/context/AuthContext';
 import { useRevenueCat, usePurchaseActions } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
+import SubscriptionModal from '../../src/components/SubscriptionModal';
 
 interface Store {
   id: string;
