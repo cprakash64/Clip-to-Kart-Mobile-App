@@ -135,6 +135,34 @@ export default function PlannerScreen() {
     );
   };
 
+  const handleDemoUpgrade = async () => {
+    setUpgrading(true);
+    try {
+      await api.upgradeSubscription('chef');
+      await refreshUser();
+      setShowSubscriptionModal(false);
+      Alert.alert('Success!', 'Chef Plan activated! You can now use Meal Planning.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'Failed to upgrade');
+    } finally {
+      setUpgrading(false);
+    }
+  };
+
+  const handleMobileSubscribe = async () => {
+    setShowSubscriptionModal(false);
+    const success = await presentPaywall();
+    if (success) {
+      try {
+        await api.upgradeSubscription('chef');
+        await refreshUser();
+      } catch (e) {
+        console.log('Backend sync will happen via webhook');
+      }
+      Alert.alert('Welcome to Chef Plan!', 'You can now use Meal Planning!');
+    }
+  };
+
   if (!isChefPlan) {
     return (
       <SafeAreaView style={styles.container}>
@@ -167,22 +195,11 @@ export default function PlannerScreen() {
           </View>
 
           <TouchableOpacity
-            style={[styles.upgradeButton, purchasing && styles.upgradeButtonDisabled]}
-            onPress={async () => {
-              const success = await presentPaywall();
-              if (success) {
-                try {
-                  await api.upgradeSubscription('chef');
-                  await refreshUser();
-                } catch (e) {
-                  console.log('Backend sync will happen via webhook');
-                }
-                Alert.alert('Welcome to Chef Plan!', 'You can now use Meal Planning!');
-              }
-            }}
-            disabled={purchasing}
+            style={[styles.upgradeButton, (purchasing || upgrading) && styles.upgradeButtonDisabled]}
+            onPress={() => setShowSubscriptionModal(true)}
+            disabled={purchasing || upgrading}
           >
-            {purchasing ? (
+            {(purchasing || upgrading) ? (
               <ActivityIndicator color="#FFF" size="small" />
             ) : (
               <>
@@ -192,6 +209,15 @@ export default function PlannerScreen() {
             )}
           </TouchableOpacity>
         </View>
+
+        <SubscriptionModal
+          visible={showSubscriptionModal}
+          onClose={() => setShowSubscriptionModal(false)}
+          onSubscribe={Platform.OS === 'web' ? handleDemoUpgrade : handleMobileSubscribe}
+          onDemoUpgrade={handleDemoUpgrade}
+          loading={upgrading || purchasing}
+          price="$9.99"
+        />
       </SafeAreaView>
     );
   }
