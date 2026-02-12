@@ -45,6 +45,8 @@ export default function CartScreen() {
   const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [exportedList, setExportedList] = useState<string | null>(null);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [upgrading, setUpgrading] = useState(false);
 
   // Use RevenueCat status on mobile, fallback to backend status on web
   const isChefPlan = Platform.OS === 'web' 
