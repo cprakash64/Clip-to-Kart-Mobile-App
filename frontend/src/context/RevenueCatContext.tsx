@@ -9,8 +9,16 @@ import Purchases, {
 } from 'react-native-purchases';
 import RevenueCatUI, { PAYWALL_RESULT } from 'react-native-purchases-ui';
 
-// RevenueCat Configuration
-const REVENUECAT_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_API_KEY || 'test_zRPaouknyKSlpgqKoLHgpNMUQkZ';
+// RevenueCat Configuration - Platform-specific API keys
+const REVENUECAT_GOOGLE_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_GOOGLE_API_KEY || 'goog_itMZeNEpRgeFtsCslZRlmhhsSmU';
+const REVENUECAT_APPLE_API_KEY = process.env.EXPO_PUBLIC_REVENUECAT_APPLE_API_KEY || '';
+
+// Select the correct API key based on platform
+const getRevenueCatApiKey = (): string => {
+  if (Platform.OS === 'android') return REVENUECAT_GOOGLE_API_KEY;
+  if (Platform.OS === 'ios') return REVENUECAT_APPLE_API_KEY;
+  return REVENUECAT_GOOGLE_API_KEY; // fallback for web
+};
 
 // Entitlement and Product IDs
 const CHEF_PLAN_ENTITLEMENT = 'chef_plan';
