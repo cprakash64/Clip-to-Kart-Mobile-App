@@ -276,7 +276,7 @@ frontend:
 
   - task: "Profile Screen"
     implemented: true
-    working: NA
+    working: true
     file: "/app/frontend/app/(tabs)/profile.tsx"
     stuck_count: 0
     priority: "medium"
@@ -285,6 +285,39 @@ frontend:
       - working: NA
         agent: "main"
         comment: "User info, subscription status, upgrade option"
+      - working: true
+        agent: "main"
+        comment: "SubscriptionModal integrated. Subscribe Now button opens modal. Try Demo (Free) upgrades to Chef Plan via backend API. Verified via screenshot."
+
+  - task: "Subscription Modal on Cart Screen"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/cart.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported Upgrade to Chef Plan button does nothing on web"
+      - working: true
+        agent: "main"
+        comment: "Integrated SubscriptionModal component. Button now opens modal with Try Demo (Free) for web. Verified via screenshot."
+
+  - task: "Subscription Modal on Planner Screen"
+    implemented: true
+    working: true
+    file: "/app/frontend/app/(tabs)/planner.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: false
+    status_history:
+      - working: false
+        agent: "user"
+        comment: "User reported Upgrade to Chef Plan button does nothing on web"
+      - working: true
+        agent: "main"
+        comment: "Integrated SubscriptionModal component. Button now opens modal. Clicking Try Demo (Free) successfully upgrades user and shows Meal Planner calendar. Verified via screenshot."
 
 metadata:
   created_by: "main_agent"
