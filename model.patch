@@ -76,7 +76,7 @@ index dd52f3c..e69de29 100644
 --+import requests
 --+import json
 --+
---+BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+--+BACKEND_URL = "https://meal-cart-ai.preview.emergentagent.com/api"
 --+
 --+def debug_endpoints():
 --+    # First register a user to get auth token
@@ -151,7 +151,7 @@ index dd52f3c..e69de29 100644
 --+import json
 --+import time
 --+
---+BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+--+BACKEND_URL = "https://meal-cart-ai.preview.emergentagent.com/api"
 --+
 --+def simple_test():
 --+    # Test health first

@@ -6,7 +6,7 @@ Debug specific failing endpoints
 import requests
 import json
 
-BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+BACKEND_URL = "https://meal-cart-ai.preview.emergentagent.com/api"
 
 def debug_endpoints():
     # First register a user to get auth token

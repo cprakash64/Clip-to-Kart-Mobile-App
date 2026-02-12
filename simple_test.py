@@ -7,7 +7,7 @@ import requests
 import json
 import time
 
-BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+BACKEND_URL = "https://meal-cart-ai.preview.emergentagent.com/api"
 
 def simple_test():
     # Test health first

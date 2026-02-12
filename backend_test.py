@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 import uuid
 
 # Backend URL from frontend environment
-BACKEND_URL = "https://clip-to-cart.preview.emergentagent.com/api"
+BACKEND_URL = "https://meal-cart-ai.preview.emergentagent.com/api"
 
 class ClipToCartTester:
     def __init__(self):
