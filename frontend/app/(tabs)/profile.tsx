@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,7 +13,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../src/context/AuthContext';
-import { useRevenueCat } from '../../src/context/RevenueCatContext';
+import { useRevenueCat, useSubscriptionStatus, usePurchaseActions } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
 
 export default function ProfileScreen() {
@@ -21,12 +21,12 @@ export default function ProfileScreen() {
   const { user, logout, refreshUser } = useAuth();
   const { 
     isChefPlan: rcIsChefPlan, 
-    purchasing, 
-    purchaseChefPlan, 
-    restorePurchases,
     offerings,
-    loading: rcLoading 
+    identifyUser,
+    logoutUser,
   } = useRevenueCat();
+  const { isChefPlan: subscriptionIsChef, expirationDate, willRenew } = useSubscriptionStatus();
+  const { presentPaywall, restorePurchases, purchasing, hasOfferings } = usePurchaseActions();
   
   const [upgrading, setUpgrading] = useState(false);
 
@@ -38,19 +38,28 @@ export default function ProfileScreen() {
   const recipesUsed = user?.recipes_used_this_month || 0;
   const recipesLimit = isChefPlan ? 'Unlimited' : 5;
 
+  // Identify user with RevenueCat when logged in
+  useEffect(() => {
+    if (user?.id && Platform.OS !== 'web') {
+      identifyUser(user.id);
+    }
+  }, [user?.id, identifyUser]);
+
   // Get price from RevenueCat offerings
   const getPrice = () => {
     if (Platform.OS === 'web') return '$9.99';
-    const pkg = offerings?.current?.availablePackages?.[0];
+    const pkg = offerings?.current?.availablePackages?.find(
+      p => p.packageType === 'MONTHLY' || p.identifier === '$rc_monthly' || p.identifier === 'monthly'
+    );
     if (pkg) {
       return pkg.product.priceString || `$${pkg.product.price}`;
     }
     return '$9.99';
   };
 
-  const handlePurchase = async () => {
+  const handleSubscribe = async () => {
     if (Platform.OS === 'web') {
-      // Web fallback - use mock upgrade
+      // Web fallback - use demo upgrade
       Alert.alert(
         'Subscribe on Mobile',
         'In-app purchases are available on the iOS and Android apps. For now, you can try the Chef Plan features with a demo upgrade.',
@@ -63,7 +72,7 @@ export default function ProfileScreen() {
               try {
                 await api.upgradeSubscription('chef');
                 await refreshUser();
-                Alert.alert('Success!', 'Demo Chef Plan activated!');
+                Alert.alert('Success!', 'Demo Chef Plan activated! Download the mobile app for real subscriptions.');
               } catch (error: any) {
                 Alert.alert('Error', error.message || 'Failed to upgrade');
               } finally {
@@ -76,19 +85,21 @@ export default function ProfileScreen() {
       return;
     }
 
-    // Use RevenueCat for mobile purchases
-    const success = await purchaseChefPlan();
+    // Use RevenueCat Paywall for mobile
+    const success = await presentPaywall();
+    
     if (success) {
-      // Also update backend to sync subscription status
+      // Sync with backend
       try {
         await api.upgradeSubscription('chef');
         await refreshUser();
       } catch (error) {
         console.log('Backend sync will happen via webhook');
       }
+      
       Alert.alert(
-        'Welcome to Chef Plan!',
-        'You now have unlimited recipe extractions, meal planning, and more!',
+        'Welcome to Chef Plan! 🎉',
+        'You now have unlimited recipe extractions, meal planning, Add to Cart, and more!',
         [{ text: 'Awesome!' }]
       );
     }
@@ -96,6 +107,7 @@ export default function ProfileScreen() {
 
   const handleRestore = async () => {
     const success = await restorePurchases();
+    
     if (success) {
       // Sync with backend
       try {
@@ -117,12 +129,27 @@ export default function ProfileScreen() {
           text: 'Logout',
           style: 'destructive',
           onPress: async () => {
+            // Logout from RevenueCat
+            if (Platform.OS !== 'web') {
+              await logoutUser();
+            }
+            // Logout from app
             await logout();
             router.replace('/(auth)/login');
           },
         },
       ]
     );
+  };
+
+  // Format expiration date
+  const formatExpirationDate = () => {
+    if (!expirationDate) return null;
+    return expirationDate.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
   };
 
   return (
@@ -167,16 +194,17 @@ export default function ProfileScreen() {
               <Text style={styles.upgradeTitle}>Upgrade to Chef Plan</Text>
             </View>
             <Text style={styles.upgradeDescription}>
-              Get unlimited recipe extractions and access to meal planning!
+              Get unlimited recipe extractions and access to premium features!
             </Text>
+            
             <View style={styles.upgradeFeatures}>
               <View style={styles.upgradeFeatureItem}>
                 <Ionicons name="infinite" size={16} color="#4CAF50" />
-                <Text style={styles.upgradeFeatureText}>Unlimited recipes</Text>
+                <Text style={styles.upgradeFeatureText}>Unlimited recipe extractions</Text>
               </View>
               <View style={styles.upgradeFeatureItem}>
                 <Ionicons name="calendar" size={16} color="#4CAF50" />
-                <Text style={styles.upgradeFeatureText}>Meal planning</Text>
+                <Text style={styles.upgradeFeatureText}>Meal planning calendar</Text>
               </View>
               <View style={styles.upgradeFeatureItem}>
                 <Ionicons name="cart" size={16} color="#4CAF50" />
@@ -194,16 +222,16 @@ export default function ProfileScreen() {
             </View>
 
             <TouchableOpacity
-              style={[styles.upgradeButton, (purchasing || upgrading) && styles.buttonDisabled]}
-              onPress={handlePurchase}
-              disabled={purchasing || upgrading || rcLoading}
+              style={[styles.subscribeButton, (purchasing || upgrading) && styles.buttonDisabled]}
+              onPress={handleSubscribe}
+              disabled={purchasing || upgrading}
             >
               {(purchasing || upgrading) ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
                 <>
                   <Ionicons name="card" size={20} color="#FFF" />
-                  <Text style={styles.upgradeButtonText}>Subscribe Now</Text>
+                  <Text style={styles.subscribeButtonText}>Subscribe Now</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -212,14 +240,17 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.restoreButton}
                 onPress={handleRestore}
-                disabled={rcLoading}
+                disabled={purchasing}
               >
                 <Text style={styles.restoreButtonText}>Restore Purchases</Text>
               </TouchableOpacity>
             )}
 
             <Text style={styles.legalText}>
-              Subscription automatically renews monthly. Cancel anytime in {Platform.OS === 'ios' ? 'App Store' : 'Google Play'} settings.
+              {Platform.OS === 'web' 
+                ? 'Full subscription features available on iOS and Android apps.'
+                : `Subscription automatically renews monthly. Cancel anytime in ${Platform.OS === 'ios' ? 'App Store' : 'Google Play'} settings.`
+              }
             </Text>
           </View>
         )}
@@ -230,6 +261,18 @@ export default function ProfileScreen() {
               <Ionicons name="star" size={20} color="#FFD700" />
               <Text style={styles.benefitTitle}>Chef Plan Active</Text>
             </View>
+            
+            {expirationDate && (
+              <View style={styles.subscriptionInfo}>
+                <Text style={styles.subscriptionInfoLabel}>
+                  {willRenew ? 'Renews on' : 'Expires on'}:
+                </Text>
+                <Text style={styles.subscriptionInfoValue}>
+                  {formatExpirationDate()}
+                </Text>
+              </View>
+            )}
+            
             <View style={styles.benefitItem}>
               <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
               <Text style={styles.benefitText}>Unlimited recipe extractions</Text>
@@ -252,7 +295,10 @@ export default function ProfileScreen() {
             </View>
 
             <Text style={styles.manageText}>
-              Manage subscription in {Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Google Play' : 'your account'} settings
+              {Platform.OS === 'web' 
+                ? 'Manage your subscription in the mobile app settings'
+                : `Manage subscription in ${Platform.OS === 'ios' ? 'App Store' : 'Google Play'} settings`
+              }
             </Text>
           </View>
         )}
@@ -437,7 +483,7 @@ const styles = StyleSheet.create({
     color: '#888',
     marginLeft: 4,
   },
-  upgradeButton: {
+  subscribeButton: {
     backgroundColor: '#FF6B35',
     borderRadius: 12,
     paddingVertical: 16,
@@ -449,7 +495,7 @@ const styles = StyleSheet.create({
   buttonDisabled: {
     opacity: 0.7,
   },
-  upgradeButtonText: {
+  subscribeButtonText: {
     color: '#FFF',
     fontSize: 18,
     fontWeight: '600',
@@ -489,6 +535,22 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '600',
     color: '#FFD700',
+  },
+  subscriptionInfo: {
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+  },
+  subscriptionInfoLabel: {
+    fontSize: 12,
+    color: '#888',
+  },
+  subscriptionInfoValue: {
+    fontSize: 14,
+    color: '#FFD700',
+    fontWeight: '600',
+    marginTop: 2,
   },
   benefitItem: {
     flexDirection: 'row',
