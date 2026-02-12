@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useFocusEffect } from 'expo-router';
 import * as Clipboard from 'expo-clipboard';
 import { useAuth } from '../../src/context/AuthContext';
-import { useRevenueCat } from '../../src/context/RevenueCatContext';
+import { useRevenueCat, usePurchaseActions } from '../../src/context/RevenueCatContext';
 import { api } from '../../src/services/api';
 
 interface Store {
@@ -34,8 +34,9 @@ interface Recipe {
 
 export default function CartScreen() {
   const router = useRouter();
-  const { user } = useAuth();
-  const { isChefPlan: rcIsChefPlan, purchasing, purchaseChefPlan } = useRevenueCat();
+  const { user, refreshUser } = useAuth();
+  const { isChefPlan: rcIsChefPlan } = useRevenueCat();
+  const { presentPaywall, purchasing } = usePurchaseActions();
   const [stores, setStores] = useState<Store[]>([]);
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [selectedRecipes, setSelectedRecipes] = useState<Set<string>>(new Set());
